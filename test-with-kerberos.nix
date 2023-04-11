@@ -142,6 +142,13 @@ makeTest
   nodes = {
 
     zk = { ... }: {
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
+      services.kerberos_server.admin_server = "kerb";
+      services.hadoop.kerberos = {
+        enable = true;
+        realm = "TEST.REALM";
+      };
+
       systemd.tmpfiles.rules = tmpFileRules;
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
@@ -423,12 +430,12 @@ kerb.systemctl("restart kadmind.service kdc.service")
 kerb.wait_for_unit("kadmind.service")
 
 zk_nodes =  [zk ]
-nn_nodes = [ nn1 nn2  ]
+nn_nodes = [ nn1, nn2  ]
 jn_nodes = [jn1]
-dn_nodes = [dn1 dn2]
-yarn_nodes = [ rm1 nm1]
+dn_nodes = [dn1]
+yarn_nodes = [ rm1, nm1]
 hive_nodes = [hiveserver]
-all_nodes = zk_nodes ++ nn_nodes ++ jn_nodes ++dn_nodes ++ yarn_nodes ++ hiveserver
+# all_nodes =  [*zk_nodes, *nn_nodes, *jn_nodes, *dn_nodes,  *yarn_nodes, *hiveserver]
 
 
 kerb.succeed("kadmin.local -q \"addprinc -pw abc zookeeper/zk\"")
@@ -550,7 +557,8 @@ nn1.succeed("curl --cacert ${./minica/minica.pem} -f https://nn1:9871")
 dn1.succeed("curl --cacert ${./minica/minica.pem} -f https://dn1:9865")
 
 
-[n.wait_for_unit("network.target") for n in yarn_nodes]
+for n in yarn_nodes:
+    n.wait_for_unit("network.target")
 
 rm1.wait_for_unit("yarn-resourcemanager")
 nm1.wait_for_unit("yarn-nodemanager")
