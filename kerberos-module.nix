@@ -13,7 +13,7 @@ with lib;
     };
     kdcs = mkOption {
       type = types.listOf types.str;
-      default = [ ];
+      default = [ config.services.kerberos_server.admin_server ];
       description = "list of kdcs that are not the admin server";
     };
   };
