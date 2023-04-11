@@ -1,5 +1,7 @@
 { config, lib, pkgs, ... }:
 
+with lib;
+
 {
   options.services = {
     hadoop.kerberos = {
@@ -16,46 +18,52 @@
   config = mkIf config.services.hadoop.kerberos.enable
     {
       services.kerberos_server = {
-        realms.${config.hadoop.kerberos.realm}.acl = map (princ: { principal = princ + "/*"; access = "all"; }) [
+        realms.${config.services.hadoop.kerberos.realm}.acl = map (princ: { principal = princ + "/*"; access = "all"; }) [
           "zookeeper"
           "hdfs"
           "yarn"
-          "hiveserver"
+          "hive"
         ];
       };
-      
-      krb5 = mkAssert (realms.${config.hadoop.kerberos.realm} != null) "kdcs for hadoop kerberos not set!" {
+
+      krb5 = {
         enable = true;
-        libdefaults.default_realm = config.hadoop.kerberos.realm;
+        libdefaults.default_realm = config.services.hadoop.kerberos.realm;
       };
+
+
+      services.hadoop = mkMerge [
+        # (mkIf config.services.hadoop.enableSsl {}) # TODO implement SSL. SSL is recommended but not required for kerberized Hadoop clusters. https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SecureMode.html#Data_Encryption_on_HTTP
+        {
+          coreSite = {
+            "hadoop.security.authentication" = "kerberos";
+            "hadoop.security.authorization" = "true";
+            "hadoop.rpc.protection" = "authentication";
+          };
+
+          hdfsSite = {
+            "dfs.block.access.token.enable" = "true";
+            "dfs.namenode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
+            "dfs.namenode.keytab.file" = "/var/security/keytab/nn.service.keytab";
+            "dfs.journalnode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
+            "dfs.journalnode.keytab.file" = "/var/security/keytab/jn.service.keytab";
+            "dfs.datanode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
+            "dfs.datanode.keytab.file" = "/var/security/keytab/dn.service.keytab";
+          };
+
+          yarnSite = {
+            "yarn.resourcemanager.principal" = "yarn/_HOST@${config.services.hadoop.kerberos.realm}";
+            "yarn.resourcemanager.keytab" = "/var/security/keytab/rm.service.keytab";
+            "yarn.nodemanager.principal" = "yarn/_HOST@${config.services.hadoop.kerberos.realm}";
+            "yarn.nodemanager.keytab" = "/var/security/keytab/nm.service.keytab";
+          };
+
+          hiveserver.hiveSite = {
+            "hive.server2.authentication" = "KERBEROS";
+            "hive.server2.authentication.kerberos.principal" = "hive/hiveserver";
+            "hive.server2.authentication.kerberos.keytab" = "/var/security/keytab/hiveserver.service.keytab";
+          };
+        }
+      ];
     };
-
-  services.hadoop = mkMerge [
-    # (mkIf config.services.hadoop.enableSsl {}) # TODO implement SSL. SSL is recommended but not required for kerberized Hadoop clusters. https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SecureMode.html#Data_Encryption_on_HTTP
-    {
-      coreSite = {
-        "hadoop.security.authentication" = "kerberos";
-        "hadoop.security.authorization" = "true";
-        "hadoop.rpc.protection" = "authentication";
-      };
-
-      hdfsSite = {
-        "dfs.block.access.token.enable" = "true";
-        "dfs.namenode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
-        "dfs.namenode.keytab.file" = "/var/security/keytab/nn.service.keytab";
-        "dfs.journalnode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
-        "dfs.journalnode.keytab.file" = "/var/security/keytab/jn.service.keytab";
-        "dfs.datanode.kerberos.principal" = "hdfs/_HOST@${config.services.hadoop.kerberos.realm}";
-        "dfs.datanode.keytab.file" = "/var/security/keytab/dn.service.keytab";
-      };
-
-      yarnSite = {
-        "yarn.resourcemanager.principal" = "yarn/_HOST@${config.services.hadoop.kerberos.realm}";
-        "yarn.resourcemanager.keytab" = "/var/security/keytab/rm.service.keytab";
-        "yarn.nodemanager.principal" = "yarn/_HOST@${config.services.hadoop.kerberos.realm}";
-        "yarn.nodemanager.keytab" = "/var/security/keytab/nm.service.keytab";
-      };
-    }
-  ];
-};
 }

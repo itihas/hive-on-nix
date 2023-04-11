@@ -11,16 +11,8 @@ with lib;
 let
   tmpFileRules = [ "d /var/security/keytab 0755 root users" "d /var/hadoop 0777 hdfs hadoop" ];
 
-  krb5 = {
-    enable = true;
-    realms."TEST.REALM" = {
-      admin_server = "kerb";
-      kdc = [ "kerb" ];
-    };
-    libdefaults.default_realm = "TEST.REALM";
-  };
-
   package = pkgs.hadoop;
+
   coreSite = {
     "fs.defaultFS" = "hdfs://ns1";
     # # Kerberos
@@ -150,7 +142,6 @@ makeTest
   nodes = {
 
     zk = { ... }: {
-      inherit krb5;
       systemd.tmpfiles.rules = tmpFileRules;
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
@@ -168,8 +159,7 @@ makeTest
     };
 
     nn1 = { pkgs, ... }: {
-      imports = [ flake.nixosModules.hiveserver ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
       services.hadoop.hiveserver.gatewayRole.enable = true;
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
@@ -177,8 +167,14 @@ makeTest
       };
 
       systemd.tmpfiles.rules = tmpFileRules;
+      services.kerberos_server.admin_server = "kerb";
+      # BROKEN deprecated, currently causin problemsdepre
       services.hadoop = {
-        inherit package coreSite hdfsSite sslServer sslClient;
+        inherit package coreSite hdfsSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
         hdfs = {
           namenode = {
             # extraFlags = authFlag "nn" "hdfs/nn1";
@@ -191,8 +187,7 @@ makeTest
     };
 
     nn2 = { pkgs, ... }: {
-      imports = [ flake.nixosModule ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
       services.hadoop.hiveserver.gatewayRole.enable = true;
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
@@ -200,8 +195,14 @@ makeTest
       };
 
       systemd.tmpfiles.rules = tmpFileRules;
+      services.kerberos_server.admin_server = "kerb";
+
       services.hadoop = {
-        inherit package coreSite hdfsSite sslServer sslClient;
+        inherit package coreSite hdfsSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
         hdfs = {
           namenode = {
             # extraFlags = authFlag "nn" "hdfs/nn2";
@@ -214,16 +215,22 @@ makeTest
     };
 
     jn1 = { ... }: {
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
 
       systemd.tmpfiles.rules = tmpFileRules;
+      services.kerberos_server.admin_server = "kerb";
+
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
       };
 
       services.hadoop = {
-        inherit package coreSite hdfsSite sslServer sslClient;
+        inherit package coreSite hdfsSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
         hdfs.journalnode = {
           # extraFlags = authFlag "jn" "hdfs/jn1";
           enable = true;
@@ -233,17 +240,22 @@ makeTest
     };
 
     dn1 = { pkgs, ... }: {
-      imports = [ flake.nixosModule ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
 
       systemd.tmpfiles.rules = tmpFileRules;
+      services.kerberos_server.admin_server = "kerb";
+
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
       };
 
       services.hadoop = {
-        inherit package coreSite hdfsSite sslServer sslClient;
+        inherit package coreSite hdfsSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
         hiveserver.gatewayRole.enable = true;
         hdfs.datanode = {
           # extraFlags = authFlag "dn" "hdfs/dn1";
@@ -255,17 +267,22 @@ makeTest
 
     # YARN cluster
     rm1 = { config, options, ... }: {
-      imports = [ flake.nixosModule ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
 
       systemd.tmpfiles.rules = [ "d /var/security/keytab 0755 root users" "d /var/hadoop 0777 yarn hadoop" ];
+      services.kerberos_server.admin_server = "kerb";
+
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
       };
 
       services.hadoop = {
-        inherit package coreSite hdfsSite yarnSite sslServer sslClient;
+        inherit package coreSite hdfsSite yarnSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
         yarn.resourcemanager = {
           enable = true;
           openFirewall = true;
@@ -275,17 +292,23 @@ makeTest
     };
 
     nm1 = { config, options, ... }: {
-      imports = [ flake.nixosModule ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
 
       systemd.tmpfiles.rules = [ "d /var/security/keytab 0755 root users" "d /var/hadoop 0777 yarn hadoop" ];
+      services.kerberos_server.admin_server = "kerb";
+
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
       };
       virtualisation.memorySize = 2048;
       services.hadoop = {
-        inherit package coreSite hdfsSite yarnSite sslServer sslClient;
+        inherit package coreSite hdfsSite yarnSite; # sslServer sslClient;
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
+
         yarn.nodemanager = {
           enable = true;
           openFirewall = true;
@@ -296,11 +319,12 @@ makeTest
 
 
     kerb = { pkgs, config, ... }: {
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
+
       nix.extraOptions = ''
         experimental-features = nix-command flakes
       '';
 
-      inherit krb5;
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
@@ -308,6 +332,8 @@ makeTest
       systemd.tmpfiles.rules = tmpFileRules;
       services.kerberos_server = {
         enable = true;
+        primary = true;
+        admin_server = "kerb";
         realms = {
           "TEST.REALM".acl = [
             { principal = "zookeeper/*"; access = "all"; }
@@ -315,6 +341,11 @@ makeTest
             { principal = "hiveserver"; access = "all"; }
           ];
         };
+      };
+
+      services.hadoop.kerberos = {
+        enable = true;
+        realm = "TEST.REALM";
       };
 
       networking.firewall.allowedTCPPorts = [ 88 464 749 ];
@@ -326,20 +357,27 @@ makeTest
 
 
     hiveserver = { ... }: {
-      imports = [ flake.nixosModule ];
-      inherit krb5;
+      imports = with flake.nixosModules; [ kerberos hadoop-kerberos hiveserver ];
 
       networking.hosts = {
         "127.0.0.2" = lib.mkForce [ ];
         "::1" = lib.mkForce [ ];
       };
       systemd.tmpfiles.rules = tmpFileRules;
+      services.kerberos_server.admin_server = "kerb";
+
       environment.systemPackages = with pkgs; [ tmux htop ];
       nix.extraOptions = ''
         experimental-features = nix-command flakes
       '';
       services.hadoop = {
-        inherit package coreSite hdfsSite yarnSite sslServer sslClient;
+        inherit package coreSite hdfsSite yarnSite; # sslServer sslClient;
+
+        kerberos = {
+          enable = true;
+          realm = "TEST.REALM";
+        };
+
         gatewayRole.enable = true;
         hiveserver = {
           enable = true;
