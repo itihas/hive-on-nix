@@ -3,7 +3,7 @@
 with lib;
 
 {
-	# to be submitted to nixpkgs.
+	# TODO submit kerb module to nixpkgs.
 	options.services.kerberos_server = {
 		primary = mkEnableOption "is this kdc server the primary server? Setting this to true will run kprop replicator with target kdcs specified in `config.services.kerberos_server.kdcs` every 2 minutes. Setting it to false will instead run the kpropd listener.";
 		admin_server = mkOption {
@@ -69,7 +69,8 @@ with lib;
 						preStart = ''
 							mkdir -m 0755 -p /var/lib/krb5kdc
 						'';
-						serviceConfig.ExecStart = "${config.krb5.kerberos}/bin/kpropd -P 754 -D -s /etc/krb5.keytab --pid-file=/run/kpropd.pid"; # remember that this means we need to create krb5.keytab. TODO write the init script that does this.
+						serviceConfig.ExecStart = "${config.krb5.kerberos}/bin/kpropd -P 754 -D -s /etc/krb5.keytab --pid-file=/run/kpropd.pid"; # remember that this means we need to create krb5.keytab.
+                        # TODO keytab init scripts.
 						restartTriggers = config.systemd.services.kadmind.restartTriggers;
 						environment = config.systemd.services.kdc.environment;
 					};
