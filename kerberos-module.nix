@@ -55,11 +55,6 @@ with lib;
 
 						'';
 					};
-
-					services.kadmind.environment.KRB5_KDC_PROFILE = pkgs.lib.mkForce
-						(pkgs.writeText "kdc.conf" ''
-							${builtins.readFile config.environment.etc."krb5kdc/kdc.conf".source}
-								'');
 				})
 
 				(mkIf (!config.services.kerberos_server.primary) {

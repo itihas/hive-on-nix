@@ -96,7 +96,6 @@ let
 		# "dfs.journalnode.kerberos.internal.spnego.principal" = "HTTP/_HOST/TEST.REALM";
 		# "dfs.journalnode.https-address" = "0.0.0.0:8481";
 
-
 	};
 
 	yarnSite = {
@@ -356,9 +355,6 @@ makeTest
 
 			networking.firewall.allowedTCPPorts = [ 88 464 749 ];
 			networking.firewall.allowedUDPPorts = [ 88 464 ];
-			systemd.services.kadmind.environment.KRB5_KDC_PROFILE = pkgs.lib.mkForce (pkgs.writeText "kdc.conf" ''
-				${builtins.readFile config.environment.etc."krb5kdc/kdc.conf".source}
-					'');
 		};
 
 
