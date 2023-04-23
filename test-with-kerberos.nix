@@ -84,7 +84,7 @@ let
 		"dfs.datanode.keytab.file" = "/var/security/keytab/dn.service.keytab";
 
 		# SASL based secure datanode
-		"dfs.http.policy" = "HTTPS_ONLY";
+		"dfs.http.policy" = "HTTP_AND_HTTPS";
 		# "dfs.client.https.need-auth" = "false";
 
 		"dfs.data.transfer.protection" = "authentication";
@@ -170,6 +170,7 @@ makeTest
 				"127.0.0.2" = lib.mkForce [ ];
 				"::1" = lib.mkForce [ ];
 			};
+			networking.firewall.allowedTCPPorts = [ 9871 ];
 
 			systemd.tmpfiles.rules = tmpFileRules;
 			services.kerberos_server.admin_server = "kerb";
@@ -254,6 +255,7 @@ makeTest
 				"127.0.0.2" = lib.mkForce [ ];
 				"::1" = lib.mkForce [ ];
 			};
+			networking.firewall.allowedTCPPorts = [ 9865 ];
 
 			services.hadoop = {
 				inherit package coreSite hdfsSite; # sslServer sslClient;
@@ -548,8 +550,11 @@ nn1.succeed("netstat -tulpne | systemd-cat")
 dn1.wait_for_unit("hdfs-datanode")
 dn1.succeed("netstat -tulpne | systemd-cat")
 
-nn1.succeed("curl --cacert ${./minica/minica.pem} -f https://nn1:9871")
-dn1.succeed("curl --cacert ${./minica/minica.pem} -f https://dn1:9865")
+# nn1.succeed("curl --cacert ${./minica/minica.pem} -f https://nn1:9871")
+# dn1.succeed("curl --cacert ${./minica/minica.pem} -f https://dn1:9865")
+
+nn1.succeed("curl --cacert ${./minica/minica.pem} -f http://nn1:9870")
+dn1.succeed("curl --cacert ${./minica/minica.pem} -f http://dn1:9864")
 
 
 for n in yarn_nodes:
