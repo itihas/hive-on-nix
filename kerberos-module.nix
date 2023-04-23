@@ -50,7 +50,7 @@ with lib;
 
 							for kdc in ${concatStringsSep " " config.services.kerberos_server.kdcs}
 								do
-										kprop -f /var/lib/krb5kdc/replica_datatrans $kdc
+									[[ $kdc == $(hostname -f) ]]	 || kprop -f /var/lib/krb5kdc/replica_datatrans $kdc
 								done
 
 						'';
