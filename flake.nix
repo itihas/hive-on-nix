@@ -42,14 +42,16 @@
 
 				with lib;
 				let cfg = config.services.hadoop.hiveserver;
+						hive = self.defaultPackage.${config.nixpkgs.system};
 				in
 				{
 
 					options.services.hadoop.hiveserver = {
 						enable = mkEnableOption "enable hiveserver";
-
+						initHDFS = mkEnableOption "initialize directories required by hiveserver in HDFS";
 						metastore = {
 							enable = mkEnableOption "enable metastore. not actually used, right now metastore is active wherever server is.";
+							initHDFS = mkEnableOption "initialize HMS database schema (idempotent, will ignore databases that already have a schema. to reinitialize please run `schematool -dbType mysql -initSchema -force`";
 							openFirewall = mkEnableOption "open firewall ports for metastore";
 						};
 						openFirewall = mkEnableOption "open firewall ports for hiveserver webUI and JDBC connection.";
@@ -111,13 +113,13 @@
 								group = config.services.hadoop.hiveserver.group;
 							};
 							environment.systemPackages = [
-								self.defaultPackage.${config.nixpkgs.system}
+								hive
 							];
 						})
 
 						(mkIf cfg.enable {
 							environment.systemPackages = [
-								self.defaultPackage.${config.nixpkgs.system}
+								hive
 							];
 							networking.firewall.allowedTCPPorts = (mkIf cfg.openFirewall [ 10000 10001 10002 14000 ]) // (mkIf cfg.metastore.openFirewall [ 9083 ]);
 
@@ -155,36 +157,6 @@
 								gatewayRole.enable = true;
 							};
 							systemd.services = {
-								hive-init = {
-									wantedBy = [ "multi-user.target" ];
-									path = [ pkgs.hadoop pkgs.sudo pkgs.coreutils config.krb5.kerberos ];
-									script = ''
-										# in future to be escaped with a kerberos enable option
-										# kinit -k -t /var/security/keytab/hiveserver.service.keytab hive/hiveserver
-
-										sudo -u hdfs hadoop fs -mkdir -p /home/hive || true
-										sudo -u hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /home/hive || true
-
-										sudo -u hdfs hadoop fs -mkdir /tmp || true
-										sudo -u hdfs hadoop fs -chown hdfs:${config.services.hadoop.hiveserver.group} /tmp || true
-										sudo -u hdfs hadoop fs -chmod g+w /tmp || true
-
-										sudo -u hdfs hadoop fs -mkdir -p /user/hive || true
-										sudo -u hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive || true
-
-										sudo -u hdfs hadoop fs -mkdir /user/hive/warehouse || true
-										sudo -u hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive/warehouse || true
-										sudo -u hdfs hadoop fs -chmod g+w /user/hive/warehouse || true
-
-										mkdir /var/run/hive || true
-										chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /var/run/hive || true
-									'';
-									serviceConfig = {
-										Type = "oneshot";
-										# The below are the instructions to initialize Hive resoruces given in https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.
-									};
-								};
-
 								hiveserver = {
 									wantedBy = [ "multi-user.target" ];
 									after = [ "network.target" "hive-init.service" ];
@@ -192,10 +164,33 @@
 									script = ''
 										hiveserver2 --hiveconf hive.root.logger=INFO,console
 									'';
-									path = with pkgs; [ self.defaultPackage.${config.nixpkgs.system} sudo coreutils bash which gawk psutils ];
+									path = with pkgs; [ hive sudo coreutils bash which gawk psutils config.krb5.kerberos ];
 									serviceConfig = {
 										User = config.services.hadoop.hiveserver.user;
 									};
+									preStart = mkIf config.services.hadoop.hiveserver.init${PKGS.HADOOP}/BIN/HDFS ''
+										# The below are the instructions to initialize Hive resoruces given in https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.
+
+										# in future to be escaped with a kerberos enable option
+										# ${config.krb5.kerberos}/bin/kinit -k -t /var/security/keytab/hiveserver.service.keytab hive/hiveserver
+
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir -p /home/hive || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /home/hive || true
+
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir /tmp || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown hdfs:${config.services.hadoop.hiveserver.group} /tmp || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chmod g+w /tmp || true
+
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir -p /user/hive || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive || true
+
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir /user/hive/warehouse || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive/warehouse || true
+										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chmod g+w /user/hive/warehouse || true
+
+										${pkgs.coreutils}/bin/mkdir /var/run/hive || true
+										${pkgs.coreutils}/bin/chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /var/run/hive || true
+									'';
 								};
 
 								hivemetastore = {
@@ -205,10 +200,13 @@
 									script = ''
 										hive --service metastore --hiveconf hive.root.logger=INFO,console
 									'';
-									path = with pkgs; [ self.defaultPackage.${config.nixpkgs.system} sudo coreutils bash which gawk psutils ];
+									path = with pkgs; [ hive sudo coreutils bash which gawk psutils ];
 									serviceConfig = {
 										User = config.services.hadoop.hiveserver.user;
 									};
+                  preStart = mkIf config.services.hadoop.hiveserver.metastore.initHDFS ''
+                  ${hive}/bin/schematool -dbType mysql -initSchema -ifNotExists
+                  '';
 								};
 							};
 						})
