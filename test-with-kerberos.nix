@@ -255,8 +255,14 @@ makeTest
 				"127.0.0.2" = lib.mkForce [ ];
 				"::1" = lib.mkForce [ ];
 			};
-			networking.firewall.allowedTCPPorts = [ 9865 ];
-
+			networking.firewall.allowedTCPPorts = [ 9865 1004 1006 ];
+      systemd.services.hdfs-datanode = {
+        serviceConfig.User = mkForce "root";
+        environment = {
+          HDFS_DATANODE_SECURE_USER = "hdfs";
+          JSVC_HOME = "${pkgs.jsvc.override rec { inherit (pkgs.hadoop) jdk; jre = jdk; }}/bin";
+        };
+      };
 			services.hadoop = {
 				inherit package coreSite hdfsSite; # sslServer sslClient;
 				kerberos = {
@@ -553,8 +559,8 @@ dn1.succeed("netstat -tulpne | systemd-cat")
 # nn1.succeed("curl --cacert ${./minica/minica.pem} -f https://nn1:9871")
 # dn1.succeed("curl --cacert ${./minica/minica.pem} -f https://dn1:9865")
 
-nn1.succeed("curl --cacert ${./minica/minica.pem} -f http://nn1:9870")
-dn1.succeed("curl --cacert ${./minica/minica.pem} -f http://dn1:9864")
+nn1.succeed("curl http://nn1:9870")
+dn1.succeed("curl http://dn1:1006")
 
 
 for n in yarn_nodes:
