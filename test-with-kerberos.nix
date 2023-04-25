@@ -344,6 +344,8 @@ makeTest
         hiveserver = {
           enable = true;
           openFirewall = true;
+          initHDFS = true;
+          metastore.initHDFS = true;
 
           hiveSite = {
             "javax.jdo.option.ConnectionURL" = "jdbc:mysql://localhost/hive?createDatabaseIfNotExist=true";
@@ -548,7 +550,8 @@ hadoop fs -chmod g+w   /user/hive/warehouse
 
 
 hiveserver.wait_for_unit("mysql.service")
-hiveserver.succeed("schematool -dbType mysql -initSchema")
+hiveserver.wait_for_unit("hivemetastore.service")
+hiveserver.succeed("schematool -dbType mysql -info")
 hiveserver.succeed("systemctl restart hive-init")
 hiveserver.succeed("systemctl restart hiveserver")
 hiveserver.wait_for_open_port(10000)

@@ -55,6 +55,8 @@ makeTest
       '';
       services.hadoop.hiveserver = {
         enable = true;
+        initHDFS = true;
+        metastore.initHDFS = true;
         hiveSite = {
           "javax.jdo.option.ConnectionURL" = "jdbc:mysql://localhost/hive?createDatabaseIfNotExist=true";
           "javax.jdo.option.ConnectionDriverName" = "com.mysql.jdbc.Driver";
@@ -114,19 +116,21 @@ prime(datanode, ["hdfs-namenode", "network.target"], [9864,9866,9867]"curl -f ht
 
 # namenode init
 
-namenode.succeed("""
-sudo -u hdfs hadoop fs -mkdir -p    /home/hive && \
-sudo -u hdfs hadoop fs -chown hive:hadoop    /home/hive  && \
-sudo -u hdfs hadoop fs -mkdir       /tmp  && \
-sudo -u hdfs hadoop fs -chown hdfs:hadoop   /tmp &&  \
-sudo -u hdfs hadoop fs -chmod g+w   /tmp &&  \
-sudo -u hdfs hadoop fs -mkdir -p    /user/hive  && \
-sudo -u hdfs hadoop fs -chown hive:hadoop   /user/hive &&  \
-sudo -u hdfs hadoop fs -mkdir    /user/hive/warehouse  && \
-sudo -u hdfs hadoop fs -chmod g+w   /user/hive/warehouse 
-""")
+# namenode.succeed("""
+# sudo -u hdfs hadoop fs -mkdir -p    /home/hive && \
+# sudo -u hdfs hadoop fs -chown hive:hadoop    /home/hive  && \
+# sudo -u hdfs hadoop fs -mkdir       /tmp  && \
+# sudo -u hdfs hadoop fs -chown hdfs:hadoop   /tmp &&  \
+# sudo -u hdfs hadoop fs -chmod g+w   /tmp &&  \
+# sudo -u hdfs hadoop fs -mkdir -p    /user/hive  && \
+# sudo -u hdfs hadoop fs -chown hive:hadoop   /user/hive &&  \
+# sudo -u hdfs hadoop fs -mkdir    /user/hive/warehouse  && \
+# sudo -u hdfs hadoop fs -chmod g+w   /user/hive/warehouse 
+# """)
 
-hiveserver.execute("schematool -dbType mysql -initSchema -ifNotExists")
+
+hiveserver.wait_for_unit("hivemetastore.service")
+hiveserver.succeed("schematool -dbType mysql -info")
 prime(hiveserver, ["mysql.service", "hiveserver.service"], [10000], "beeline -u \"jdbc:hive2://hiveserver:10000/default;auth=noSasl\" -e \"SHOW TABLES;\"")
 
   '';
