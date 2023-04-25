@@ -260,7 +260,7 @@ makeTest
         serviceConfig.User = mkForce "root";
         environment = {
           HDFS_DATANODE_SECURE_USER = "hdfs";
-          JSVC_HOME = "${pkgs.jsvc.override rec { inherit (pkgs.hadoop) jdk; jre = jdk; }}/bin";
+          JSVC_HOME = "${pkgs.jsvc.override rec { inherit (pkgs.hadoop) jdk; jre = jdk.home; }}/bin";
         };
       };
 			services.hadoop = {
