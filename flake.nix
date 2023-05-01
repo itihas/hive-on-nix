@@ -168,7 +168,7 @@
 									serviceConfig = {
 										User = config.services.hadoop.hiveserver.user;
 									};
-									preStart = mkIf config.services.hadoop.hiveserver.init${PKGS.HADOOP}/BIN/HDFS ''
+									preStart = mkIf config.services.hadoop.hiveserver.init ''
 										# The below are the instructions to initialize Hive resoruces given in https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.
 
 										# in future to be escaped with a kerberos enable option
