@@ -371,7 +371,7 @@ makeTest
 					"TEST.REALM".acl = [
 						{ principal = "zookeeper/*"; access = "all"; }
 						{ principal = "hdfs/*"; access = "all"; }
-						{ principal = "hiveserver"; access = "all"; }
+						{ principal = "hive/*"; access = "all"; }
 					];
 				};
 			};
@@ -411,6 +411,11 @@ makeTest
 				gatewayRole.enable = true;
 				hiveserver = {
 					enable = true;
+          init = true;
+          metastore = {
+            enable = true;
+            init = true;
+          };
 					openFirewall = true;
 
 					hiveSite = {
@@ -469,6 +474,7 @@ kerb.succeed("kadmin.local -q \"addprinc -pw abc hdfs/dn1\"")
 kerb.succeed("kadmin.local -q \"addprinc -pw abc yarn/rm1\"")
 kerb.succeed("kadmin.local -q \"addprinc -pw abc yarn/nm1\"")
 kerb.succeed("kadmin.local -q \"addprinc -pw abc hive/hiveserver\"")
+kerb.succeed("kadmin.local -q \"addprinc -pw abc hdfs/hive-init\"")
 
 
 kerb.wait_for_unit("network.target")
@@ -476,58 +482,29 @@ zk.wait_for_unit("network.target")
 jn1.wait_for_unit("network.target")
 nn1.wait_for_unit("network.target")
 dn1.wait_for_unit("network.target")
+hiveserver.wait_for_unit("network.target")
 
 
 # TODO finish this
-def cert_init(node,node_type,principal,user):
+def cert_init(node,node_type,principal,user,group,cert):
 		node.succeed("kadmin -p "+principal+" -w \"abc\" -q \"ktadd -k /var/security/keytab/"+node_type+".service.keytab "+principal+"\"")
-		node.copy_from_host(source="${./minica/nn1/keystore.jks}",target="/var/security/keystore.jks")
+		node.copy_from_host(source=cert,target="/var/security/keystore.jks")
 		node.succeed("chown -R "+user+" /var/security")
+		node.succeed("chgrp -R "+group+" /var/security")
 
 
+cert_init(zk,"zookeeper","zookeeper/zk","zookeeper","zookeeper","${./minica/zk/keystore.jks}")
 
-nn1.succeed("kadmin -p hdfs/nn1 -w \"abc\" -q \"ktadd -k /var/security/keytab/nn.service.keytab hdfs/nn1\"")
-nn1.copy_from_host(source="${./minica/nn1/keystore.jks}",target="/var/security/keystore.jks")
-# nn1.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-nn1.succeed("chown -R hdfs /var/security")
-nn1.succeed("chgrp -R hadoop /var/security")
+cert_init(nn1,"nn","hdfs/nn1","hdfs","hadoop","${./minica/nn1/keystore.jks}")
+cert_init(nn2,"nn","hdfs/nn2","hdfs","hadoop","${./minica/nn2/keystore.jks}")
+cert_init(jn1,"jn","hdfs/jn1","hdfs","hadoop","${./minica/jn1/keystore.jks}")
+cert_init(dn1,"dn","hdfs/dn1","hdfs","hadoop","${./minica/dn1/keystore.jks}")
 
-nn2.succeed("kadmin -p hdfs/nn2 -w \"abc\" -q \"ktadd -k /var/security/keytab/nn.service.keytab hdfs/nn2\"")
-nn2.copy_from_host(source="${./minica/nn2/keystore.jks}",target="/var/security/keystore.jks")
-# nn2.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-nn2.succeed("chown -R hdfs /var/security")
-nn2.succeed("chgrp -R hadoop /var/security")
+cert_init(rm1,"rm","yarn/rm1","yarn","hadoop","${./minica/rm1/keystore.jks}")
+cert_init(nm1,"nm","yarn/nm1","yarn","hadoop","${./minica/nm1/keystore.jks}")
 
-zk.succeed("kadmin -p zookeeper/zk -w \"abc\" -q \"ktadd -k /var/security/keytab/zookeeper.service.keytab zookeeper/zk\"")
-zk.copy_from_host(source="${./minica/zk/keystore.jks}",target="/var/security/keystore.jks")
-# zk.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-zk.succeed("chown -R zookeeper /var/security")
-zk.succeed("chgrp -R zookeeper /var/security")
-
-jn1.succeed("kadmin -p hdfs/jn1 -w \"abc\" -q \"ktadd -k /var/security/keytab/jn.service.keytab hdfs/jn1\"")
-jn1.copy_from_host(source="${./minica/jn1/keystore.jks}",target="/var/security/keystore.jks")
-# jn1.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-jn1.succeed("chown -R hdfs /var/security")
-jn1.succeed("chgrp -R hadoop /var/security")
-
-dn1.succeed("kadmin -p hdfs/dn1 -w \"abc\" -q \"ktadd -k /var/security/keytab/dn.service.keytab hdfs/dn1\"")
-dn1.copy_from_host(source="${./minica/dn1/keystore.jks}",target="/var/security/keystore.jks")
-# dn1.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-dn1.succeed("chown -R hdfs /var/security")
-dn1.succeed("chgrp -R hadoop /var/security")
-
-
-rm1.succeed("kadmin -p yarn/rm1 -w \"abc\" -q \"ktadd -k /var/security/keytab/rm.service.keytab yarn/rm1\"")
-rm1.copy_from_host(source="${./minica/rm1/keystore.jks}",target="/var/security/keystore.jks")
-# rm1.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-rm1.succeed("chown -R yarn /var/security")
-rm1.succeed("chgrp -R hadoop /var/security")
-
-nm1.succeed("kadmin -p yarn/nm1 -w \"abc\" -q \"ktadd -k /var/security/keytab/nm.service.keytab yarn/nm1\"")
-nm1.copy_from_host(source="${./minica/nm1/keystore.jks}",target="/var/security/keystore.jks")
-# nm1.copy_from_host(source="${./minica/jssecacerts}",target="/var/security/jssecacerts")
-nm1.succeed("chown -R yarn /var/security")
-nm1.succeed("chgrp -R hadoop /var/security")
+cert_init(hiveserver,"hiveserver","hive/hiveserver","hive","hadoop","${./minica/hiveserver/keystore.jks}")
+cert_init(hiveserver,"hive-init","hdfs/hive-init","hive","hadoop","${./minica/hiveserver/keystore.jks}")
 
 
 zk.succeed("systemctl restart zookeeper.service")
@@ -596,36 +573,31 @@ nm1.succeed("yarn node -list | systemd-cat")
 
 
 
-hiveserver.wait_for_unit("network.target")
-hiveserver.succeed("kadmin -p hive/hiveserver -w \"abc\" -q \"ktadd -k /var/security/keytab/hiveserver.service.keytab hive/hiveserver\"")
-hiveserver.succeed("chown hive /var/security/keytab/hiveserver.service.keytab")
-hiveserver.succeed("chgrp hadoop /var/security/keytab/hiveserver.service.keytab")
-hiveserver.copy_from_host(source="${./minica/hiveserver/keystore.jks}",target="/var/security/keystore.jks")
 
 
-nn2.succeed("kinit -k -t /var/security/keytab/nn.service.keytab hdfs/nn2")
-nn2.succeed("hadoop fs -mkdir /home")
-nn2.succeed("hadoop fs -mkdir /home/hive")
-nn2.succeed("hadoop fs -chown hive:hadoop /home/hive")
-nn2.succeed("hadoop fs -mkdir /tmp")
-nn2.succeed("hadoop fs -chown hdfs:hadoop /tmp")
-nn2.succeed("hadoop fs -chmod g+w /tmp")
-nn2.succeed("hadoop fs -mkdir /user")
-nn2.succeed("hadoop fs -mkdir /user/hive")
-nn2.succeed("hadoop fs -chown hive:hadoop	 /user/hive")
-nn2.succeed("hadoop fs -mkdir /user/hive/warehouse")
-nn2.succeed("hadoop fs -chmod g+w	 /user/hive/warehouse")
+# nn2.succeed("kinit -k -t /var/security/keytab/nn.service.keytab hdfs/nn2")
+# nn2.succeed("hadoop fs -mkdir /home")
+# nn2.succeed("hadoop fs -mkdir /home/hive")
+# nn2.succeed("hadoop fs -chown hive:hadoop /home/hive")
+# nn2.succeed("hadoop fs -mkdir /tmp")
+# nn2.succeed("hadoop fs -chown hdfs:hadoop /tmp")
+# nn2.succeed("hadoop fs -chmod g+w /tmp")
+# nn2.succeed("hadoop fs -mkdir /user")
+# nn2.succeed("hadoop fs -mkdir /user/hive")
+# nn2.succeed("hadoop fs -chown hive:hadoop	 /user/hive")
+# nn2.succeed("hadoop fs -mkdir /user/hive/warehouse")
+# nn2.succeed("hadoop fs -chmod g+w	 /user/hive/warehouse")
 
 
 
 hiveserver.wait_for_unit("mysql.service")
-hiveserver.succeed("schematool -dbType mysql -initSchema")
-hiveserver.succeed("systemctl restart hive-init")
+# hiveserver.succeed("schematool -dbType mysql -initSchema")
+hiveserver.succeed("systemctl restart hivemetastore")
 hiveserver.succeed("systemctl restart hiveserver")
 hiveserver.wait_for_open_port(10000)
 hiveserver.succeed("""
 kinit -k -t /var/security/keytab/hiveserver.service.keytab hive/hiveserver && \
-beeline -u \"jdbc:hive2://hiveserver:10000/;principal=hive/hiveserver@TEST.REALM\" -e \"SHOW TABLES;\"
+beeline -u \"jdbc:hive2://hiveserver:10001/;principal=hive/hiveserver@TEST.REALM;transportMode=http;httpPath=cliservice;auth=kerberos;\" -e \"SHOW TABLES;\"
 """)
 	'';
 }

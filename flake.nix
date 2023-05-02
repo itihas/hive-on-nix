@@ -48,10 +48,10 @@
 
 					options.services.hadoop.hiveserver = {
 						enable = mkEnableOption "enable hiveserver";
-						initHDFS = mkEnableOption "initialize directories required by hiveserver in HDFS";
+						init = mkEnableOption "initialize directories required by hiveserver in HDFS";
 						metastore = {
 							enable = mkEnableOption "enable metastore. not actually used, right now metastore is active wherever server is.";
-							initHDFS = mkEnableOption "initialize HMS database schema (idempotent, will ignore databases that already have a schema. to reinitialize please run `schematool -dbType mysql -initSchema -force`";
+							init = mkEnableOption "initialize HMS database schema (idempotent, will ignore databases that already have a schema. to reinitialize please run `schematool -dbType mysql -initSchema -force`";
 							openFirewall = mkEnableOption "open firewall ports for metastore";
 						};
 						openFirewall = mkEnableOption "open firewall ports for hiveserver webUI and JDBC connection.";
@@ -63,7 +63,7 @@
             };
             group = mkOption {
               type = types.str;
-              default = "hadoop";
+              default = config.users.users.hdfs.group;
               description = "group that hive services run with";
             };
 
@@ -169,24 +169,24 @@
 										User = config.services.hadoop.hiveserver.user;
 									};
 									preStart = mkIf config.services.hadoop.hiveserver.init ''
-										# The below are the instructions to initialize Hive resoruces given in https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.
+										# The below are the instructions to initialize Hive resources given in https://cwiki.apache.org/confluence/display/Hive/GettingStarted#GettingStarted-RunningHiveServer2andBeeline.
 
 										# in future to be escaped with a kerberos enable option
-										# ${config.krb5.kerberos}/bin/kinit -k -t /var/security/keytab/hiveserver.service.keytab hive/hiveserver
+										${config.krb5.kerberos}/bin/kinit -k -t /var/security/keytab/hive-init.service.keytab hdfs/hive-init
 
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir -p /home/hive || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /home/hive || true
+										 ${pkgs.hadoop}/bin/hadoop fs -mkdir -p /home/hive || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /home/hive || true
 
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir /tmp || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown hdfs:${config.services.hadoop.hiveserver.group} /tmp || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chmod g+w /tmp || true
+										 ${pkgs.hadoop}/bin/hadoop fs -mkdir /tmp || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chown hdfs:${config.users.users.hdfs.group} /tmp || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chmod g+rwx /tmp || true
 
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir -p /user/hive || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive || true
+										 ${pkgs.hadoop}/bin/hadoop fs -mkdir -p /user/hive || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive || true
 
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -mkdir /user/hive/warehouse || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive/warehouse || true
-										${pkgs.sudo}/bin/sudo -u ${pkgs.hadoop}/bin/hdfs hadoop fs -chmod g+w /user/hive/warehouse || true
+										 ${pkgs.hadoop}/bin/hadoop fs -mkdir /user/hive/warehouse || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /user/hive/warehouse || true
+										 ${pkgs.hadoop}/bin/hadoop fs -chmod g+rwx /user/hive/warehouse || true
 
 										${pkgs.coreutils}/bin/mkdir /var/run/hive || true
 										${pkgs.coreutils}/bin/chown ${config.services.hadoop.hiveserver.user}:${config.services.hadoop.hiveserver.group} /var/run/hive || true
@@ -204,8 +204,10 @@
 									serviceConfig = {
 										User = config.services.hadoop.hiveserver.user;
 									};
-                  preStart = mkIf config.services.hadoop.hiveserver.metastore.initHDFS ''
-                  ${hive}/bin/schematool -dbType mysql -initSchema -ifNotExists
+                  preStart = mkIf config.services.hadoop.hiveserver.metastore.init ''
+									${config.krb5.kerberos}/bin/kinit -k -t /var/security/keytab/hiveserver.service.keytab hive/hiveserver
+                  ${hive}/bin/schematool -dbType mysql -initSchema || true
+                  ${hive}/bin/schematool -dbType mysql -info 
                   '';
 								};
 							};
